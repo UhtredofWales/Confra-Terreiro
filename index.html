@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clubinho – Rateio ao vivo</title>
 
+<!-- Favicon moderno com emoji de clubinho/casa -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+
 <!-- Firebase SDKs (Versão Compatível via Script) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -109,6 +112,15 @@ h1 { font-size: 1.4rem; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
 .cota small { color: var(--mut); display: block; font-size: 0.75rem; margin-bottom: 4px; }
 .cota b { font-size: 1.25rem; font-weight: 700; }
 
+/* Input wrapper para cifra fixa */
+.input-cifra-wrap { display: flex; align-items: center; gap: 4px; font-weight: 700; font-size: 1.25rem; }
+.input-cifra-wrap span { color: var(--mut); font-size: 1.1rem; }
+.input-cifra-wrap input { width: 100%; padding: 0; border: none; background: none; font-weight: 700; font-size: inherit; }
+
+.input-cifra-sm { display: flex; align-items: center; gap: 2px; font-weight: 700; font-size: 0.95rem; }
+.input-cifra-sm span { color: var(--mut); font-size: 0.85rem; }
+.input-cifra-sm input { width: 100%; padding: 0; border: none; background: none; font-weight: 700; font-size: inherit; }
+
 /* Controles & Form */
 input, button { font: inherit; color: var(--tx); background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 9px 12px; min-width: 0; transition: all 0.15s ease; }
 button { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -164,7 +176,6 @@ input:focus { outline: 2px solid var(--ac); outline-offset: 1px; border-color: t
 .cells div { background: var(--bg); border: 1px solid var(--bd); border-radius: 10px; padding: 8px; }
 .cells small { display: block; color: var(--mut); font-size: 0.7rem; margin-bottom: 2px; }
 .cells b { font-variant-numeric: tabular-nums; font-size: 0.95rem; }
-.cells input { width: 100%; padding: 0; border: none; background: none; font-weight: 700; font-size: 0.95rem; }
 .cells .t b { color: var(--bad); } .cells .f b { color: var(--warn); }
 .flash { animation: fl 0.8s; } @keyframes fl { 0% { background: var(--ac); color: #fff; } }
 
@@ -217,8 +228,11 @@ input:focus { outline: 2px solid var(--ac); outline-offset: 1px; border-color: t
     <div class="card"><small>Confirmados</small><b id="vConf">0</b></div>
     <div class="card"><small>Cota atual por pessoa</small><b id="vShare">–</b></div>
     <div class="card">
-      <small>Valor total (R$)</small>
-      <input type="number" id="total" min="0" step="0.01" style="width:100%;padding:0;border:none;background:none;font-weight:700;font-size:1.25rem">
+      <small>Valor total</small>
+      <div class="input-cifra-wrap">
+        <span>R$</span>
+        <input type="number" id="total" min="0" step="0.01">
+      </div>
     </div>
   </div>
 
@@ -393,7 +407,7 @@ function renderList(){
     '<label class="sw" title="Confirmado"><input type="checkbox" data-a="conf"'+(p.conf?" checked":"")+dis+'><i></i></label>'+
     '<div class="cells">'+
     '<div><small>Cota atual</small><b class="'+(flash&&p.conf?"flash":"")+'">'+(p.conf?brl(c.share):"–")+'</b></div>'+
-    '<div><small>Pagou</small><input type="number" min="0" step="0.01" inputmode="decimal" data-a="pago" value="'+(p.pago||"")+'" placeholder="0,00"'+dis+'></div>'+
+    '<div><small>Pagou</small><div class="input-cifra-sm"><span>R$</span><input type="number" min="0" step="0.01" inputmode="decimal" data-a="pago" value="'+(p.pago||"")+'" placeholder="0,00"'+dis+'></div></div>'+
     '<div class="f"><small>Falta</small><b>'+(s.f?brl(s.f):"–")+'</b></div>'+
     '<div class="t"><small>Troco</small><b>'+(s.t?brl(s.t):"–")+'</b></div></div>'+
     (CAN?'<div class="acts">'+(p.conf&&s.f>0?'<button data-a="quita">Quitar '+brl(c.share)+'</button>':'')+'<button class="x" data-a="del">Remover</button></div>':'')+
