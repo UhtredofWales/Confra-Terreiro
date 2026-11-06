@@ -248,7 +248,7 @@ input:focus { outline: 2px solid var(--ac); outline-offset: 1px; border-color: t
 
   <div id="lista"></div>
 
-  <p class="note">Cota atual = total ÷ confirmados, arredondada para cima ao centavo. Quem paga antes paga mais; quem paga depois paga menos. Troco = o que a pessoa pagou − cota atual. Tudo é sincronizado automaticamente para todos os dispositivos conectados.</p>
+  <p class="note">Cota atual = total ÷ confirmados, calculada em tempo real. Quem entra primeiro garante a reserva; conforme novas pessoas confirmam, a cota cai e o excedente pago a mais é apontado automaticamente como troco a devolver aos primeiros.</p>
 </main>
 
 <div id="toast"></div>
@@ -263,11 +263,11 @@ var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&
 
 var P=[], TOTAL=300, MODE="load", CAN=true, FILTER="all", Q="", PENDING=false, PREV=null, DB=null, LS="clubinho_v2";
 
-/* As tuas credenciais do Firebase */
+/* Credenciais do Firebase */
 var firebaseConfig = {
   apiKey: "AIzaSyDMjPJO5mUZck9_MlVT5pkObnOE-o58cp4",
   authDomain: "clubinho-rateio.firebaseapp.com",
-  databaseURL: "https://clubinho-rateio-default-rtdb.firebaseio.com", // Se o teu banco estiver em outro subdomínio, ele ajusta sozinho
+  databaseURL: "https://clubinho-rateio-default-rtdb.firebaseio.com",
   projectId: "clubinho-rateio",
   storageBucket: "clubinho-rateio.firebasestorage.app",
   messagingSenderId: "91997216035",
@@ -276,27 +276,40 @@ var firebaseConfig = {
 };
 
 function toast(t){var e=$("toast");e.textContent=t;e.className="on";clearTimeout(toast.t);toast.t=setTimeout(function(){e.className=""},2200)}
-function calc(){var n=P.filter(function(p){return p.conf}).length;return{n:n,share:n?Math.ceil(TOTAL*100/n)/100:0}}
-function st(p,share){var g=p.pago||0;
-  if(p.conf){var d=r2(share-g);if(d>0)return{k:"pend",f:d,t:0};if(d<0)return{k:"troco",f:0,t:-d};return{k:"ok",f:0,t:0}}
-  return g>0?{k:"troco",f:0,t:g}:{k:"off",f:0,t:0}}
-function anim(el,to){var from=el._v||0;el._v=to;if(from===to){el.textContent=brl(to);return}
-  var t0=performance.now();(function f(t){var k=Math.min(1,(t-t0)/450),e=1-Math.pow(1-k,3);el.textContent=brl(from+(to-from)*e);if(k<1)requestAnimationFrame(f)})(t0)}
 
-/* Escrita e Sincronização */
+/* Cálculo de Cota Dinâmica Proporcional */
+function calc(){
+  var n=P.filter(function(p){return p.conf}).length;
+  return { n: n, share: n ? r2(TOTAL / n) : 0 };
+}
+
+function st(p, share){
+  var g = p.pago || 0;
+  if (!p.conf) {
+    return g > 0 ? { k: "troco", f: 0, t: g } : { k: "off", f: 0, t: 0 };
+  }
+  var d = r2(share - g);
+  if (d > 0) return { k: "pend", f: d, t: 0 };
+  if (d < 0) return { k: "troco", f: 0, t: -d };
+  return { k: "ok", f: 0, t: 0 };
+}
+
+function anim(el,to){
+  var from=el._v||0; el._v=to;
+  if(from===to){el.textContent=brl(to);return}
+  var t0=performance.now();
+  (function f(t){
+    var k=Math.min(1,(t-t0)/450), e=1-Math.pow(1-k,3);
+    el.textContent=brl(from+(to-from)*e);
+    if(k<1)requestAnimationFrame(f);
+  })(t0);
+}
+
+/* Persistência Local e Firebase */
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify({total:TOTAL,pessoas:P}))}catch(e){}}
 
-function syncDbPessoas(){
-  if(MODE==="firebase" && DB){
-    DB.ref("pessoas").set(P);
-  }
-}
-
-function syncDbTotal(){
-  if(MODE==="firebase" && DB){
-    DB.ref("total").set(TOTAL);
-  }
-}
+function syncDbPessoas(){ if(MODE==="firebase" && DB) DB.ref("pessoas").set(P); }
+function syncDbTotal(){ if(MODE==="firebase" && DB) DB.ref("total").set(TOTAL); }
 
 function find(id){return P.filter(function(p){return p.id===id})[0]}
 
