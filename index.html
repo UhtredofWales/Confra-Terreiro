@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clubinho – Controle de Rateio</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f27;--mut:#6b7280;--bd:#e3e6eb;--ac:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1218;--card:#181c25;--tx:#eceff4;--mut:#9aa3b2;--bd:#2a303c;--ac:#5b8def;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1218;--card:#181c25;--tx:#eceff4;--mut:#9aa3b2;--bd:#2a303c;--ac:#5b8def;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:4px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px}
+.card small{color:var(--mut);display:block;font-size:.78rem}
+.card b{font-size:1.25rem}
+.ok b{color:var(--ok)}.warn b{color:var(--warn)}.bad b{color:var(--bad)}.ac b{color:var(--ac)}
+.bar{height:10px;border-radius:6px;background:var(--bd);overflow:hidden;margin:6px 0 14px}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+input,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+input[type=number]{width:110px}
+button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+.grow{flex:1;min-width:140px}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;min-width:760px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{font-size:.75rem;color:var(--mut);text-transform:uppercase}
+tr.off td{opacity:.55}
+.tag{font-weight:600}.t-ok{color:var(--ok)}.t-warn{color:var(--warn)}.t-bad{color:var(--bad)}
+.x{border:none;background:none;color:var(--bad);font-size:1.1rem;padding:4px 8px}
+.note{color:var(--mut);font-size:.8rem;margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+<h1>🏠 Clubinho – Controle de Rateio</h1>
+
+<div class="grid">
+  <div class="card ac"><small>Valor total</small><b id="vTotal">–</b></div>
+  <div class="card"><small>Confirmados</small><b id="vConf">0</b></div>
+  <div class="card ac"><small>Valor por pessoa</small><b id="vShare">–</b></div>
+  <div class="card ok"><small>Em caixa (recebido)</small><b id="vCaixa">–</b></div>
+  <div class="card warn"><small>Falta receber</small><b id="vFalta">–</b></div>
+  <div class="card bad"><small>Troco a devolver</small><b id="vTroco">–</b></div>
+  <div class="card ok"><small>Caixa após devolver troco</small><b id="vLiquido">–</b></div>
+</div>
+<div class="bar"><i id="prog"></i></div>
+
+<div class="row">
+  <label class="card" style="padding:6px 10px">Valor total (R$)
+    <input type="number" id="total" min="0" step="0.01" value="300"></label>
+  <input class="grow" id="nome" placeholder="Nome da pessoa" autocomplete="off">
+  <button class="p" id="add">+ Adicionar</button>
+  <button id="reset">Limpar pagamentos</button>
+</div>
+
+<div class="wrap">
+<table>
+  <thead><tr><th>Confirmado</th><th>Nome</th><th>Cota atual</th><th>Pagou (R$)</th><th>Falta</th><th>Troco a devolver</th><th>Situação</th><th></th></tr></thead>
+  <tbody id="lista"></tbody>
+</table>
+</div>
+<p class="note">A cota atual é o total ÷ confirmados (arredondada para cima ao centavo) e muda a cada confirmação: quem paga antes paga mais, quem paga depois paga menos. O troco de cada um é sempre o que a pessoa pagou menos a cota atual. Quem não está confirmado e já pagou entra no troco integral. Os dados ficam salvos neste navegador.</p>
+</main>
+
+<script>
+var KEY="clubinho_v1", S={total:300,pessoas:[]};
+try{var raw=localStorage.getItem(KEY);if(raw)S=JSON.parse(raw)}catch(e){}
+if(!S||!Array.isArray(S.pessoas))S={total:300,pessoas:[]};
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+var brl=function(v){return (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})};
+var r2=function(v){return Math.round(v*100)/100};
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function calc(){
+  var n=S.pessoas.filter(function(p){return p.conf}).length;
+  var share=n?Math.ceil(S.total*100/n)/100:0;
+  return {n:n,share:share};
+}
+
+function render(){
+  var c=calc(),caixa=0,falta=0,troco=0;
+  var tb=$("lista");tb.innerHTML="";
+  S.pessoas.forEach(function(p,i){
+    var pago=p.pago||0,deve=0,tr=0,sit,cls;
+    caixa+=pago;
+    if(p.conf){
+      var d=r2(c.share-pago);
+      if(d>0){deve=d;falta+=d;sit="Pendente";cls="t-warn"}
+      else if(d<0){tr=-d;troco+=tr;sit="Devolver troco";cls="t-bad"}
+      else{sit="Quitado";cls="t-ok"}
+    }else{
+      if(pago>0){tr=pago;troco+=pago;sit="Devolver tudo";cls="t-bad"}else{sit="Não confirmado";cls=""}
+    }
+    var row=document.createElement("tr");
+    if(!p.conf)row.className="off";
+    row.innerHTML=
+      '<td><input type="checkbox" data-a="conf" data-i="'+i+'"'+(p.conf?" checked":"")+'></td>'+
+      '<td>'+esc(p.nome)+'</td>'+
+      '<td><b>'+(p.conf?brl(c.share):"–")+'</b></td>'+
+      '<td><input type="number" min="0" step="0.01" data-a="pago" data-i="'+i+'" value="'+(pago||"")+'" placeholder="0,00"> '+
+        (p.conf&&deve>0?'<button data-a="quita" data-i="'+i+'">Quitar</button>':'')+'</td>'+
+      '<td>'+(deve?brl(deve):"–")+'</td>'+
+      '<td class="tag '+(tr?"t-bad":"")+'">'+(tr?brl(tr):"–")+'</td>'+
+      '<td class="tag '+cls+'">'+sit+'</td>'+
+      '<td><button class="x" data-a="del" data-i="'+i+'" title="Remover">✕</button></td>';
+    tb.appendChild(row);
+  });
+  if(!S.pessoas.length)tb.innerHTML='<tr><td colspan="8" style="color:var(--mut)">Adicione as pessoas acima.</td></tr>';
+  $("vTotal").textContent=brl(S.total);
+  $("vConf").textContent=c.n;
+  $("vShare").textContent=c.n?brl(c.share):"–";
+  $("vCaixa").textContent=brl(r2(caixa));
+  $("vFalta").textContent=brl(r2(falta));
+  $("vTroco").textContent=brl(r2(troco));
+  $("vLiquido").textContent=brl(r2(caixa-troco));
+  $("prog").style.width=(S.total>0?Math.min(100,(caixa-troco)/S.total*100):0)+"%";
+  $("total").value=S.total;
+  save();
+}
+
+function addPessoa(){
+  var v=$("nome").value.trim();if(!v)return;
+  S.pessoas.push({nome:v,conf:true,pago:0});
+  $("nome").value="";$("nome").focus();render();
+}
+$("add").onclick=addPessoa;
+$("nome").onkeydown=function(e){if(e.key==="Enter")addPessoa()};
+$("total").onchange=function(){S.total=Math.max(0,parseFloat(this.value)||0);render()};
+$("reset").onclick=function(){if(confirm("Zerar todos os pagamentos?")){S.pessoas.forEach(function(p){p.pago=0});render()}};
+
+var tb=$("lista");
+tb.addEventListener("change",function(e){
+  var t=e.target,i=+t.dataset.i,a=t.dataset.a;if(a===undefined)return;
+  if(a==="conf")S.pessoas[i].conf=t.checked;
+  if(a==="pago")S.pessoas[i].pago=Math.max(0,r2(parseFloat(t.value)||0));
+  render();
+});
+tb.addEventListener("click",function(e){
+  var t=e.target.closest("button");if(!t)return;
+  var i=+t.dataset.i,a=t.dataset.a;
+  if(a==="del"){S.pessoas.splice(i,1);render()}
+  if(a==="quita"){S.pessoas[i].pago=calc().share;render()}
+});
+render();
+</script>
+</body>
+</html>
